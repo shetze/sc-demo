@@ -246,7 +246,7 @@ content:
         }
   add_symlinks:
     - link: /etc/systemd/system/sockets.target.wants/routingmanagerd.socket
-    - target: /usr/lib/systemd/system/routingmanagerd.socket
+      target: /usr/lib/systemd/system/routingmanagerd.socket
   systemd:
     enabled_services:
       # Enable ssh daemon
