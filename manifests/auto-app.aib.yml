@@ -61,7 +61,7 @@ content:
   add_files:
     - path: /etc/selinux/config
       text: |
-        SELINUX=permissive
+        SELINUX=enforcing
         SELINUXTYPE=automotive
     - path: /usr/lib/tmpfiles.d/relabel.conf
       text: |
