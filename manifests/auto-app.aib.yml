@@ -36,6 +36,8 @@ content:
     - auto-apps
     - dlt-daemon
     - dlt-tools
+    - container-selinux
+    - selinux-policy-automotive
     - vsomeip3-routingmanager
     - vsomeip3-selinux
     - vsomeip3-tools
