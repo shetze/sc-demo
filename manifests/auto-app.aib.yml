@@ -55,6 +55,9 @@ content:
     - path: /etc/qm/containers/systemd/
       parents: true
       exist_ok: true
+    - path: /etc/systemd/system/sockets.target.wants
+      parents: true
+      exist_ok: true
   add_files:
     - path: /etc/selinux/config
       text: |
@@ -161,7 +164,7 @@ content:
         [Container]
         Image=localhost/auto-apps
         Network=none
-        Environment=SOCKET_PATH=/run/vsomeip/vsomeip.socket
+        Environment=SOCKET_PATH=/run/vsomeip/vsomeip-0
         Volume=/var/run/vsomeip/:/var/run/vsomeip/
         Volume=/var/run/dlt/:/var/run/dlt/
         SecurityLabelType=ipc_t
@@ -241,7 +244,9 @@ content:
             "request_response_delay": "1500"
           }
         }
-
+  add_symlinks:
+    - link: /etc/systemd/system/sockets.target.wants/routingmanagerd.socket
+    - target: /usr/lib/systemd/system/routingmanagerd.socket
   systemd:
     enabled_services:
       # Enable ssh daemon
@@ -305,6 +310,7 @@ qm:
           [Container]
           Image=localhost/auto-apps
           Network=none
+          Environment=SOCKET_PATH=/run/vsomeip/vsomeip-0
           Volume=/run/vsomeip/:/run/vsomeip/
           Volume=/run/dlt/:/run/dlt/
           Volume=/run/ipc/:/run/ipc/
@@ -324,6 +330,7 @@ qm:
           
           [Container]
           Image=localhost/auto-apps
+          Environment=SOCKET_PATH=/run/vsomeip/vsomeip-0
           Volume=/run/vsomeip/:/run/vsomeip/
           Volume=/run/dlt/:/run/dlt/
           Volume=/run/ipc/:/run/ipc/
