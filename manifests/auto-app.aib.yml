@@ -12,7 +12,7 @@ content:
       priority: 10
     - id: local
       baseurl: file:///workspace/export/
-      priority: 5      
+      priority: 6      
   rpms:
     - auto-app
     - vim
