@@ -16,7 +16,7 @@ oc get user "$USER_NAME" &>/dev/null || {
 }
 
 # Create a devspaces namespace
-NAMESPACE="$USER_NAME-devspaces"
+NAMESPACE="devspaces-$USER_NAME"
 echo "NAMESPACE: $NAMESPACE"
 
 oc create -f - <<-EOF
