@@ -16,7 +16,7 @@ content:
       priority: 10
     - id: local
       baseurl: file:///workspace/export/
-      priority: 6      
+      priority: 5      
   rpms:
     - auto-app
     #- pcp-pmda-bpf
