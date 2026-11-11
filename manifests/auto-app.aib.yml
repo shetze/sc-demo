@@ -371,16 +371,19 @@ content:
       - pmcd.service
       - pmproxy.service
       - valkey.service
+      - webui.service
+    disabled_services:
       - cyclictest.service
       - stress-ng.service
       - sysbench.service
-      - webui.service
-    disabled_services:
       - pmie.service
       - pmlogger.service
 
 
 qm:
+  memory_limit:
+    # Do not allow QM to use more than 50% of memory before OOM kicks in
+    max: 50%
   content:
     repos:
       - id: epel
