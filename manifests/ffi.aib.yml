@@ -1,0 +1,264 @@
+name: ffi-demo
+
+image:
+  hostname: ffi-demo
+  selinux_mode: enforcing
+
+content:
+  repos:
+    - id: automotive_sig
+      baseurl: https://mirror.stream.centos.org/SIGs/10-stream/autosd/$arch/packages-main/
+
+  rpms:
+
+    - kmod
+    - openssh-server
+    - pcp-pmda-bpf
+    - pcp-pmda-bpftrace
+    - pcp-pmda-podman
+    - pcp-pmda-openmetrics
+    - pcp-system-tools
+    - pcp-zeroconf
+    - podman
+    - procps
+    - valkey
+    - sudo
+    - tar
+    - bluechi-controller
+    - bluechi-agent
+    - rtla
+    - vim
+    - dnf
+    - realtime-tests
+    - chrony
+    - tmux
+
+
+  container_images:
+    - source: quay.io/shetze/ffi_server-arm64
+      tag: latest
+      name: localhost/ffi_server
+      containers-transport: docker
+    - source: quay.io/shetze/sysbench-arm64
+      tag: latest
+      name: localhost/sysbench
+      containers-transport: docker
+    - source: quay.io/shetze/stress-ng-arm64
+      tag: latest
+      name: localhost/stress-ng
+      containers-transport: docker
+
+  make_dirs:
+    - path: /etc/ssh/authorized_keys
+      mode: 0755
+      parents: true
+      exist_ok: true
+    - path: /etc/containers/systemd/qm.container.d
+      mode: 0755
+      parents: true
+      exist_ok: true
+    - path: /etc/sysconfig
+      mode: 0755
+      parents: true
+      exist_ok: true
+    - path: /etc/systemd/system
+      mode: 0755
+      parents: true
+      exist_ok: true
+    - path: /usr/lib/webui
+      mode: 0755
+      parents: true
+      exist_ok: true
+    - path: /usr/lib/openmetrics-static
+      mode: 0755
+      parents: true
+      exist_ok: true
+
+  add_files:
+    - path: /etc/systemd/system/ffi_server.socket
+      source_path: systemd/ffi_server.socket
+    - path: /etc/containers/systemd/ffi_server.container
+      source_path: systemd/ffi_server.container
+    - path: /etc/containers/systemd/qm.container.d/10-ipc-demo.conf
+      source_path: systemd/10-ipc-demo.conf
+    - path: /etc/containers/systemd/qm.container.d/20-oom-score-adjust-demo.conf
+      source_path: systemd/20-oom-score-adjust-demo.conf
+    - path: /etc/sysconfig/pmcd
+      source_path: sysconfig/pmcd
+    - path: /etc/systemd/system/cyclictest.service
+      source_path: systemd/cyclictest.service
+    - path: /etc/systemd/system/sysbench.service
+      source_path: systemd/sysbench.service
+    - path: /etc/systemd/system/stress-ng.service
+      source_path: systemd/stress-ng.service
+    - path: /usr/bin/run_sysbench.sh
+      source_path: files/run_sysbench.sh
+    - path: /usr/bin/run_cyclictest.sh
+      source_path: files/run_cyclictest.sh
+    - path: /usr/bin/cycle_stress-ng.sh
+      source_path: files/cycle_stress-ng.sh
+    - path: /usr/lib/tmpfiles.d/openmetrics_pmda.conf
+      source_path: files/openmetrics_pmda.conf
+    - path: /usr/lib/openmetrics-static/pmdas_openmetrics.sysbench
+      source_path: files/pmdas_openmetrics.sysbench
+    - path: /usr/lib/openmetrics-static/pmdas_openmetrics.cyclictest
+      source_path: files/pmdas_openmetrics.cyclictest
+    - path: /etc/pcp/openmetrics/asil_sysbench.url
+      source_path: pmdas/asil_sysbench.url
+    - path: /etc/pcp/openmetrics/qm_sysbench.url
+      source_path: pmdas/qm_sysbench.url
+    - path: /etc/pcp/openmetrics/cyclictest.url
+      source_path: pmdas/cyclictest.url
+    - path: /etc/pcp/openmetrics/qm_high_prio_app.url
+      source_path: pmdas/qm_high_prio_app.url
+    - path: /etc/pcp/openmetrics/qm_low_prio_app.url
+      source_path: pmdas/qm_low_prio_app.url
+    - path: /etc/pcp/openmetrics/.NeedInstall
+      source_path: pmdas/NeedInstall
+    - path: /etc/ssh/authorized_keys/root
+      source_path: files/authorized_keys
+    - path: /etc/ssh/sshd_config.d/99-authorized-keys-path.conf
+      source_path: files/99-authorized-keys-path.conf
+    - path: /usr/bin/webui.py
+      source_path: webui/webui.py
+    - path: /usr/lib/webui/index.html
+      source_path: webui/index.html
+    - path: /etc/systemd/system/webui.service
+      source_path: systemd/webui.service
+
+  chmod_files:
+    - path: /usr/bin/run_sysbench.sh
+      mode: "0755"
+    - path: /usr/bin/run_cyclictest.sh
+      mode: "0755"
+    - path: /usr/bin/cycle_stress-ng.sh
+      mode: "0755"
+    - path: /usr/lib/openmetrics-static/pmdas_openmetrics.sysbench
+      mode: "0644"
+    - path: /usr/lib/openmetrics-static/pmdas_openmetrics.cyclictest
+      mode: "0644"
+    - path: /var/lib/pcp/config/pmda
+      mode: "0777"
+    - path: /etc/ssh/authorized_keys/root
+      mode: "0600"
+    - path: /etc/ssh/sshd_config.d/99-authorized-keys-path.conf
+      mode: "0644"
+    - path: /usr/bin/webui.py
+      mode: "0755"
+
+  systemd:
+    enabled_services:
+      - ffi_server.socket
+      - pmcd.service
+      - pmproxy.service
+      - valkey.service
+      - cyclictest.service
+      - stress-ng.service
+      - sysbench.service
+      - webui.service
+    disabled_services:
+      - pmie.service
+      - pmlogger.service
+
+qm:
+  memory_limit:
+    # Do not allow QM to use more than 50% of memory before OOM kicks in
+    max: 50%
+
+  content:
+    rpms:
+      - bluechi-agent
+
+    container_images:
+      - source: quay.io/shetze/ffi_client-arm64
+        tag: latest
+        name: localhost/ffi_client
+        containers-transport: docker
+      - source: quay.io/shetze/sysbench-arm64
+        tag: latest
+        name: localhost/sysbench
+        containers-transport: docker
+      - source: quay.io/shetze/stress-ng-arm64
+        tag: latest
+        name: localhost/stress-ng
+        containers-transport: docker
+
+    make_dirs:
+      - path: /etc/containers/systemd
+        mode: 0755
+        parents: true
+        exist_ok: true
+      - path: /usr/lib/openmetrics-static
+        mode: 0755
+        parents: true
+        exist_ok: true
+
+    add_files:
+      - path: /etc/containers/systemd/ffi_client.container
+        source_path: systemd/ffi_client.container
+      - path: /etc/systemd/system/sysbench.service
+        source_path: systemd/sysbench.service
+      - path: /usr/bin/run_sysbench.sh
+        source_path: files/run_sysbench.sh
+      - path: /usr/lib/openmetrics-static/pmdas_openmetrics.sysbench
+        source_path: files/pmdas_openmetrics.sysbench
+      - path: /usr/lib/openmetrics-static/pmdas_openmetrics.qm_high_prio_app
+        source_path: files/pmdas_openmetrics.sysbench
+      - path: /usr/lib/openmetrics-static/pmdas_openmetrics.qm_low_prio_app
+        source_path: files/pmdas_openmetrics.sysbench
+      - path: /usr/lib/tmpfiles.d/qm_openmetrics_seeds.conf
+        source_path: files/qm_openmetrics_seeds.conf
+      - path: /usr/bin/run_log_collector.sh
+        source_path: files/run_log_collector.sh
+      - path: /etc/containers/systemd/qm_high_prio_app.container
+        source_path: systemd/qm_high_prio_app.container
+      - path: /etc/containers/systemd/qm_low_prio_app.container
+        source_path: systemd/qm_low_prio_app.container
+      - path: /etc/systemd/system/log_collector@.service
+        source_path: systemd/log_collector@.service
+      - path: /etc/containers/systemd/stress-ng_high_prio@.container
+        source_path: systemd/stress-ng_high_prio@.container
+      - path: /etc/containers/systemd/stress-ng_low_prio@.container
+        source_path: systemd/stress-ng_low_prio@.container
+
+    chmod_files:
+      - path: /usr/bin/run_sysbench.sh
+        mode: "0755"
+      - path: /usr/bin/run_log_collector.sh
+        mode: "0755"
+      - path: /usr/lib/openmetrics-static/pmdas_openmetrics.sysbench
+        mode: "0644"
+      - path: /usr/lib/openmetrics-static/pmdas_openmetrics.qm_high_prio_app
+        mode: "0644"
+      - path: /usr/lib/openmetrics-static/pmdas_openmetrics.qm_low_prio_app
+        mode: "0644"
+
+  # systemd:
+
+network:
+  dynamic: {}
+
+auth:
+  groups:
+    guest:
+      gid: 2000
+
+  users:
+    guest:
+      # "password"
+      password: $6$xoLqEUz0cGGJRx01$H3H/bFm0myJPULNMtbSsOFd/2BnHqHkMD92Sfxd.EKM9hXTWSmELG8cf205l6dktomuTcgKGGtGDgtvHVXSWU.
+      gid: 2000
+      uid: 2000
+    admin:
+      groups:
+        - wheel
+      home: /home/admin
+      # "password"
+      password: $6$xoLqEUz0cGGJRx01$H3H/bFm0myJPULNMtbSsOFd/2BnHqHkMD92Sfxd.EKM9hXTWSmELG8cf205l6dktomuTcgKGGtGDgtvHVXSWU.
+
+  # "password"
+  root_password: $6$xoLqEUz0cGGJRx01$H3H/bFm0myJPULNMtbSsOFd/2BnHqHkMD92Sfxd.EKM9hXTWSmELG8cf205l6dktomuTcgKGGtGDgtvHVXSWU.
+
+  sshd_config:
+    PasswordAuthentication: true
+    PermitRootLogin: true

@@ -1,0 +1,17 @@
+[Unit]
+description=QM app at lower priority
+Requires=log_collector@qm_low_prio_app.service
+After=log_collector@qm_low_prio_app.service
+
+[Container]
+ContainerName=qm-low-prio-app
+Image=localhost/sysbench:latest
+Network=none
+Entrypoint=bash
+Exec=-c "sysbench cpu run --threads=$(nproc) --time=0 --report-interval=1"
+
+[Service]
+CPUWeight=50
+
+# [Install]
+# WantedBy=multi-user.target

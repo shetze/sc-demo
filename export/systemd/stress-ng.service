@@ -1,0 +1,10 @@
+[Unit]
+description=Run cycle of stress-ng loads at FIFO10
+
+[Service]
+ExecStart=/bin/bash -c "/usr/bin/cycle_stress-ng.sh -a 1 -f 10 -t 30 -s 30"
+KillSignal=SIGINT
+Type=simple
+
+[Install]
+WantedBy=multi-user.target

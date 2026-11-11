@@ -1,0 +1,10 @@
+[Unit]
+description=Run sysbench load
+
+[Service]
+ExecStart=/bin/bash -c "/usr/bin/run_sysbench.sh"
+KillSignal=SIGINT
+Type=simple
+
+[Install]
+WantedBy=multi-user.target

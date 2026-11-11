@@ -1,0 +1,17 @@
+[Unit]
+Requires=ffi_server.socket
+After=ffi_server.socket
+Description=ffi_server container
+
+[Container]
+Volume=/run/ipc:/run/ipc
+Network=none
+SecurityLabelType=ipc_t
+ContainerName=ffi_server
+Image=localhost/ffi_server:latest
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

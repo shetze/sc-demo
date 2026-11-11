@@ -1,0 +1,12 @@
+[Unit]
+description=Collect a sysbench container log
+PartOf=%i.service
+
+[Service]
+ExecStart=/bin/bash -c "/usr/bin/run_log_collector.sh %i"
+ExecStopPost=/bin/bash -c "printf 'eps 0\n' > /var/lib/pmdas_openmetrics.%i"
+KillSignal=SIGINT
+Type=simple
+
+[Install]
+WantedBy=multi-user.target

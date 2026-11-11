@@ -1,0 +1,12 @@
+[Unit]
+Description=ffi_client container
+
+[Container]
+Volume=/run/ipc:/run/ipc
+SecurityLabelType=qm_container_ipc_t
+ContainerName=ffi_client
+Image=localhost/ffi_client:latest
+
+[Service]
+MemoryMax=50%
+Restart=always

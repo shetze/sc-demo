@@ -1,0 +1,10 @@
+[Unit]
+description=Run cyclictest load at FIFO 1
+
+[Service]
+ExecStart=/bin/bash -c "/usr/bin/run_cyclictest.sh -a 1 -f 1 -p /var/lib/cyclictest_pipe -o /var/lib/pmdas_openmetrics.cyclictest"
+KillSignal=SIGINT
+Type=simple
+
+[Install]
+WantedBy=multi-user.target

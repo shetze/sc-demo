@@ -1,0 +1,16 @@
+[Unit]
+description=Run stress-ng loads with memory usage at %i
+
+[Container]
+ContainerName=stress-ng-high-prio-%i
+Image=localhost/stress-ng:latest
+Network=none
+AddCapability=SYS_RESOURCE
+PodmanArgs=--oom-score-adj=-500
+# --oom-able disables respawnning a stressor process when one is killed by the OOM Killer
+# --no-oom-adjust disables the stress-ng's oom score adjustment and follows the system default
+Exec=-m 1 --vm-bytes %i --timeout 0 --oomable --no-oom-adjust
+
+# This doesn't work
+# [Service]
+# OOMScoreAdjust=-500

@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>FFI Demo Control Panel</title>
+    <link rel="icon" href="data:,">
+
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            max-width: 1200px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #fff5f5;
+        }
+
+        .controls-container {
+            display: flex;
+            gap: 24px;
+        }
+
+        h3 {
+            color: #991b1b;
+            margin: 0 0 16px 0;
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .control-section {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(220, 38, 38, 0.1);
+            border: 2px solid rgba(220, 38, 38, 0.1);
+            height: auto;
+            position: relative;
+            /* Ensure the pseudo-element is positioned relative to this container */
+        }
+
+        .control-section:hover {
+            box-shadow: 0 4px 6px rgba(220, 38, 38, 0.15);
+            transform: translateY(-1px);
+            transition: all 0.2s ease;
+        }
+
+        .control-info {
+            color: #991b1b;
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .status-dot {
+            position: absolute;
+            top: 15px;
+            /* Adjust to position the dot */
+            right: 15px;
+            /* Adjust to position the dot */
+            width: 10px;
+            /* Size of the dot */
+            height: 10px;
+            /* Size of the dot */
+            background-color: lightgreen;
+            /* Green color for the dot */
+            border-radius: 50%;
+            /* Make it a circle */
+        }
+
+        button {
+            background-color: #dc2626;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 500;
+            min-width: 100px;
+            margin-bottom: 16px;
+        }
+
+        button:hover {
+            background-color: #b91c1c;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(220, 38, 38, 0.2);
+        }
+
+        button:active {
+            transform: translateY(0);
+            box-shadow: none;
+        }
+
+        button[data-started="true"] {
+            background-color: #7f1d1d;
+        }
+
+        button[data-started="true"]:hover {
+            background-color: #991b1b;
+        }
+
+        .command-info {
+            background: #fef2f2;
+            padding: 12px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            color: #991b1b;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .command-label {
+            color: #991b1b;
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .component-container {
+            display: flex;
+            margin-bottom: 20px;
+            gap: 100px;
+        }
+
+        .partition {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 50%;
+            padding: 20px;
+            box-sizing: border-box;
+            border: 2px solid black;
+            background: white;
+            border: none;
+            background: none;
+        }
+
+        .qm-partition {
+            box-sizing: border-box;
+            border: 2px solid black;
+        }
+
+
+        .bottom-row {
+            margin-top: auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 10px 0;
+            border-top: 1px solid #ccc;
+        }
+
+        .qm-label {
+            font-size: 14px;
+        }
+
+        .cpuweight-section {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .cpuweight-section label {
+            font-size: 14px;
+        }
+
+        .cpuweight-section input {
+            padding: 3px;
+            width: 50px;
+            font-size: 12px;
+            text-align: center;
+        }
+
+        .cpuweight-section button {
+            height: 100%;
+            padding: 5px 12px;
+            font-size: 12px;
+            margin: 0;
+        }
+
+        .performance-copilot,
+        .os-image {
+            background: #c9daf8;
+            text-align: center;
+            padding: 20px;
+            width: 100%;
+            box-sizing: border-box;
+            margin-top: 20px;
+        }
+
+        .os-image {
+            background: #f4cccc;
+            margin-top: 0;
+        }
+
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            font-size: 50px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="component-container">
+        <div class="partition qm-partition">
+
+            <div class="control-section">
+                <div class="status-dot"></div>
+                <h3>CPU Throughput 100% Load Hog</h3>
+                <div class="control-info">Starts a load attempting to consume 100% of
+                    all CPUs and reporting back measured throughput</div>
+                <div class="button-group">
+                    <button id="start-sysbench-qm">Start</button>
+                    <button id="stop-sysbench-qm">Stop</button>
+                </div>
+                <div class="command-label">Executes command:</div>
+                <div class="command-info">podman exec qm systemctl start sysbench</div>
+            </div>
+
+            <div class="control-section">
+                <div class="status-dot"></div>
+                <h3>Memory FFI Malicious Agent</h3>
+                <div class="control-info">Starts an agent attempting to consume 100% of
+                    available memory</div>
+                <div class="button-group">
+                    <button id="start-ffi_client-qm">Start</button>
+                    <button id="stop-ffi_client-qm">Stop</button>
+                </div>
+                <div class="command-label">Executes command:</div>
+                <div class="command-info">podman exec qm systemctl start ffi_client</div>
+            </div>
+
+            <div class="bottom-row">
+                <div class="qm-label">QM Partition</div>
+                <div class="cpuweight-section">
+                    <label for="cpuweight-input">CPUWeight</label>
+                    <select id="cpuweight-input">
+                        <option value="idle" selected>idle</option>
+                        <option value="100">100</option>
+                        <option value="50">50</option>
+                        <option value="20">20</option>
+                        <option value="">unset</option>
+                    </select>
+                    <button id="apply-cpuweight">Apply</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="partition">
+            <div class="control-section">
+                <div class="status-dot"></div>
+                <h3>CPU Throughput 100% Load Hog</h3>
+                <div class="control-info">Starts a load attempting to consume 100% of
+                    all CPUs and reporting back measured throughput</div>
+                <div class="button-group">
+                    <button id="start-sysbench">Start</button>
+                    <button id="stop-sysbench">Stop</button>
+                </div>
+                <div class="command-label">Executes command:</div>
+                <div class="command-info">systemctl start sysbench</div>
+            </div>
+
+            <div class="control-section">
+                <div class="status-dot"></div>
+                <h3>Memory FFI Listener Agent</h3>
+                <div class="control-info">Starts an agent actively listening on a
+                    socket for memory dump data from the FFI Malicious Agent</div>
+                <div class="button-group">
+                    <button id="start-ffi_server">Start</button>
+                    <button id="stop-ffi_server">Stop</button>
+                </div>
+                <div class="command-label">Executes command:</div>
+                <div class="command-info">systemctl start ffi_server</div>
+            </div>
+
+            <div class="control-section">
+                <div class="status-dot"></div>
+                <h3>CPU Latency Real-Time Baseline (FIFO 1)</h3>
+                <div class="control-info">Starts a FIFO 1 priority real-time baseline
+                    workload and reports its measured latency</div>
+                <div class="button-group">
+                    <button id="start-cyclictest">Start</button>
+                    <button id="stop-cyclictest">Stop</button>
+                </div>
+                <div class="command-label">Executes command:</div>
+                <div class="command-info">systemctl start cyclictest</div>
+            </div>
+
+            <div class="control-section">
+                <div class="status-dot"></div>
+                <h3>CPU Latency Real-Time Hog Workload (FIFO 10)</h3>
+                <div class="control-info">Starts a FIFO 10 priority real-time CPU hog
+                    workload that will preempt the FIFO 1 baseline workload</div>
+                <div class="button-group">
+                    <button id="start-stress-ng">Start</button>
+                    <button id="stop-stress-ng">Stop</button>
+                </div>
+                <div class="command-label">Executes command:</div>
+                <div class="command-info">systemctl start stress-ng</div>
+            </div>
+
+            <div class="performance-copilot">Performance copilot</div>
+        </div>
+    </div>
+
+    <div class="os-image">OS image</div>
+    <div id="loading-overlay">Loading... Please wait</div>
+    <script>
+        async function handleStartStopClick(event) {
+            buttonId = event.target.id;
+            console.log("Button clicked: " + buttonId);
+            const firstHyphenIndex = buttonId.indexOf('-');
+            const action = buttonId.substring(0, firstHyphenIndex);
+            const target = buttonId.substring(firstHyphenIndex + 1);
+
+            startOverlay(`${action} ${target}, please wait...`);
+
+            try {
+                // Issue start/stop action with await
+                const response = await fetch(`/api/component/${target}?action=${action}`, { method: 'POST' });
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.text();
+                console.log('Success:', data);
+            } catch (error) {
+                console.error('Error:', error);
+            } finally {
+                // Update the button state
+                await refreshComponentStatus();
+
+                // Hide loading overlay at the end
+                stopOverlay();
+            }
+        }
+
+        function handleApplyCpuWeightClick(event) {
+            buttonId = event.target.id;
+            const cpuWeight = document.getElementById('cpuweight-input').value;
+            startOverlay(`Set QM CPU weight to ${cpuWeight}, please wait...`);
+
+            fetch(`/api/qmcpuweight?weight=${cpuWeight}`, { method: 'POST' })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.text();
+                })
+                .then(data => {
+                    console.log('Success:', data);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                })
+                .finally(() => {
+                    // Hide loading overlay at the end
+                    stopOverlay();
+                });
+        }
+
+        async function refreshCpuWeight() {
+            try {
+                // Fetch CPU weight
+                const response = await fetch('/api/qmcpuweight');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log('CPU weight:', data.weight);
+
+                // Update UI based on the CPU weight
+                const cpuWeightInput = document.getElementById('cpuweight-input');
+                cpuWeightInput.value = data.weight;
+            } catch (error) {
+                console.error('Error fetching CPU weight:', error);
+            } finally {
+                console.log('CPU weight update complete');
+            }
+        }
+
+        async function refreshComponentStatus() {
+            try {
+                // Fetch component statuses
+                const response = await fetch('/api/status');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log('Component statuses:', data);
+
+                // Update UI based on the status of each component
+                for (const [component, isActive] of Object.entries(data)) {
+                    const start = document.getElementById(`start-${component}`);
+                    const stop = document.getElementById(`stop-${component}`);
+                    const cmdLabel = start.parentElement.parentElement.querySelector(".command-info");
+                    const statusDot = start.parentElement.parentElement.querySelector(".status-dot");
+
+                    if (isActive) {
+                        start.style.display = "none";
+                        stop.style.display = "inline-block";
+                        statusDot.style.backgroundColor = "lightgreen";
+                        cmdLabel.innerHTML = cmdLabel.innerHTML.replace("start", "stop");
+                    } else {
+                        start.style.display = "inline-block";
+                        stop.style.display = "none";
+                        statusDot.style.backgroundColor = "lightgrey";
+                        cmdLabel.innerHTML = cmdLabel.innerHTML.replace("stop", "start");
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching component statuses:', error);
+            } finally {
+                console.log('Component status update complete');
+            }
+        }
+
+        function startOverlay(message) {
+            const overlay = document.getElementById('loading-overlay'); // Declare overlay locally
+            overlay.innerText = message;
+            overlay.style.display = 'flex';
+        }
+
+        function stopOverlay() {
+            const overlay = document.getElementById('loading-overlay'); // Declare overlay locally
+            overlay.style.display = 'none';
+            console.log('Overlay hidden');
+        }
+
+        // Add click event listeners to all buttons
+        document.addEventListener('DOMContentLoaded', async function () {
+            // Start stop button listener
+            const startStopButtons = document.querySelectorAll('button[id^="start"], button[id^="stop"]');
+            startStopButtons.forEach(button => {
+                button.addEventListener('click', handleStartStopClick); // Use named function
+                button.style.display = "none";
+            });
+
+            // Apply CPUWeight listener
+            const applyCpuWeightButton = document.getElementById('apply-cpuweight');
+            applyCpuWeightButton.addEventListener('click', handleApplyCpuWeightClick);
+
+            startOverlay(`Refresh status, please wait...`);
+            await refreshComponentStatus();
+            await refreshCpuWeight();
+            stopOverlay();
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,10 @@
+[Unit]
+Description=An example of systemd unix socket
+
+[Socket]
+ListenStream=%t/ipc/ffi_server.socket
+RuntimeDirectory=ipc
+SELinuxContextFromNet=yes
+
+[Install]
+WantedBy=sockets.target

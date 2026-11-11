@@ -1,0 +1,11 @@
+[Unit]
+Description=Web UI Service
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/webui.py
+WorkingDirectory=/usr/lib/webui
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
