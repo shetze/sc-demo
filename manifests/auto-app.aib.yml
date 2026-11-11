@@ -55,6 +55,7 @@ content:
     - vsomeip3-selinux
     - vsomeip3-tools
     - policycoreutils-python-utils
+    - setools-console
     - audit
   container_images:
     - source: quay.io/shetze/auto-apps
