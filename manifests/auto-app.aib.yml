@@ -2,6 +2,10 @@
 
 name: auto-app
 
+image:
+  hostname: auto-app
+  selinux_mode: enforcing
+
 content:
   repos:
     - id: epel
@@ -402,6 +406,7 @@ qm:
       - iputils
       - tcpdump
       - auto-apps
+      - stress-ng
     container_images:
       - source: quay.io/centos/arm64v8
         tag: stream10
@@ -584,10 +589,10 @@ qm:
       #  source_path: systemd/qm_low_prio_app.container
       #- path: /etc/systemd/system/log_collector@.service
       #  source_path: systemd/log_collector@.service
-      #- path: /etc/containers/systemd/stress-ng_high_prio@.container
-      #  source_path: systemd/stress-ng_high_prio@.container
-      #- path: /etc/containers/systemd/stress-ng_low_prio@.container
-      #  source_path: systemd/stress-ng_low_prio@.container
+      - path: /etc/containers/systemd/stress-ng_high_prio@.container
+        source_path: systemd/stress-ng_high_prio@.container
+      - path: /etc/containers/systemd/stress-ng_low_prio@.container
+        source_path: systemd/stress-ng_low_prio@.container
 
     chmod_files:
       - path: /usr/bin/run_sysbench.sh
