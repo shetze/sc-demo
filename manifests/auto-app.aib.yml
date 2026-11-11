@@ -215,6 +215,8 @@ content:
         Image=localhost/auto-apps
         Network=none
         Environment=SOCKET_PATH=/run/vsomeip/vsomeip-0
+        ENGINE_DEMO_CPU_MS=300
+        ENGINE_DEMO_HOLD_MUTEX=1
         Volume=/var/run/vsomeip/:/var/run/vsomeip/
         Volume=/var/run/dlt/:/var/run/dlt/
         SecurityLabelType=ipc_t
