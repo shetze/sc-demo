@@ -4,7 +4,7 @@ name: auto-app
 
 image:
   hostname: auto-app
-  selinux_mode: enforcing
+  # selinux_mode: enforcing
 
 content:
   repos:
