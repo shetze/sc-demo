@@ -4,7 +4,7 @@ name: auto-app
 
 image:
   hostname: auto-app
-  # selinux_mode: enforcing
+  selinux_mode: enforcing
 
 content:
   repos:
@@ -63,7 +63,7 @@ content:
     - audit
   container_images:
     - source: quay.io/shetze/auto-apps
-      tag: latest
+      tag: 01
       name: localhost/auto-apps
       containers-transport: docker
     - source: quay.io/shetze/ffi_server-arm64
@@ -189,7 +189,7 @@ content:
         Requires=dlt.socket
         
         [Container]
-        Image=quay.io/shetze/atdev:auto-apps
+        Image=localhost/auto-apps
         Network=none
         Volume=/run/vsomeip/:/run/vsomeip/
         Volume=/run/dlt/:/run/dlt/
@@ -414,7 +414,7 @@ qm:
         tag: stream10
         name: localhost/cs10      
       - source: quay.io/shetze/auto-apps
-        tag: latest
+        tag: 01
         name: localhost/auto-apps
       - source: quay.io/shetze/ffi_client-arm64
         tag: latest
