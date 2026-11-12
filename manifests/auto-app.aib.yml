@@ -63,7 +63,7 @@ content:
     - audit
   container_images:
     - source: quay.io/shetze/auto-apps
-      tag: '01'
+      tag: 'latest'
       name: localhost/auto-apps
       containers-transport: docker
     - source: quay.io/shetze/ffi_server-arm64
@@ -414,7 +414,7 @@ qm:
         tag: stream10
         name: localhost/cs10      
       - source: quay.io/shetze/auto-apps
-        tag: '01'
+        tag: 'latest'
         name: localhost/auto-apps
       - source: quay.io/shetze/ffi_client-arm64
         tag: latest
