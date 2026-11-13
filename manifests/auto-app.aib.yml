@@ -438,14 +438,6 @@ qm:
         parents: true
         exist_ok: true
     add_files:
-      - path: /usr/local/bin/demo-tmux.sh
-        text: |
-          tmux split-window -v -t $SESSION:0
-          tmux split-window -v -t $SESSION:0.0
-          tmux send-keys -t $SESSION:0.0 "podman exec -it qm podman exec -it systemd-radio radio-client" C-m
-          tmux send-keys -t $SESSION:0.2 "top" C-m
-          tmux select-pane -t $SESSION:0.1
-          tmux attach-session -t $SESSION
       - path: /etc/containers/systemd/dlt.container
         text: |
           [Unit]
