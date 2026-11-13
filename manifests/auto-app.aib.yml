@@ -217,7 +217,7 @@ content:
         Environment=SOCKET_PATH=/run/vsomeip/vsomeip-0
         Environment=ENGINE_DEMO_CPU_MS=300
         Environment=ENGINE_DEMO_HOLD_MUTEX=0
-        Environment=ENGINE_DEMO_RAM_SIZE=8G
+        Environment=ENGINE_DEMO_RAM_SIZE=768M
         Volume=/var/run/vsomeip/:/var/run/vsomeip/
         Volume=/var/run/dlt/:/var/run/dlt/
         SecurityLabelType=ipc_t
