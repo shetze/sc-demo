@@ -5,7 +5,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "1"
 spec:
-  replicas: 5
+  replicas: 40
   serviceName: qemu-exporter
   podManagementPolicy: Parallel
   selector:
