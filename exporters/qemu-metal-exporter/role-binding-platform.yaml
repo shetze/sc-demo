@@ -1,0 +1,46 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: qemu-metal-exporter-rolebinding
+  namespace: "auto-jumpstarter"
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: jumpstarter-access-role
+subjects:
+  - kind: ServiceAccount
+    name: qemu-metal-exporter
+    namespace: "auto-exporters"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: qemu-metal-exporter-image-puller
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  namespace: automotive-dev-operator-system # TODO change to auto-builder
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:image-puller
+subjects:
+  - kind: ServiceAccount
+    name: qemu-metal-exporter
+    namespace: "auto-exporters"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: system:openshift:scc:privileged
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:privileged
+subjects:
+  - kind: ServiceAccount
+    name: qemu-metal-exporter
+    namespace: "auto-exporters"

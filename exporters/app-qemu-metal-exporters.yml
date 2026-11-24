@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: "qemu-exporters"
+  namespace: "openshift-gitops"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: rhas
+  revisionHistoryLimit: 3
+  source:
+    path: exporters/qemu-metal-exporter
+    repoURL: "https://github.com/rhadp-examples/rhas-starter"
+    targetRevision: "main"
+  destination:
+    namespace: "auto-exporters"
+    server: https://kubernetes.default.svc
+  ignoreDifferences:
+    - group: ""
+      kind: ConfigMap
+      name: registry-service-ca
+      jsonPointers:
+        - /data
+  syncPolicy:
+    automated:
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 10m

@@ -5,7 +5,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "1"
 spec:
-  replicas: 40
+  replicas: 1
   serviceName: qemu-exporter
   podManagementPolicy: Parallel
   selector:
@@ -28,7 +28,7 @@ spec:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
             - matchExpressions:
-              - key: auto.node-role/metal
+              - key: auto.node-role/builder
                 operator: In
                 values:
                 - "true"
@@ -175,7 +175,7 @@ spec:
               # create the exporter config
               EXPORTER_NAME=$(cat /etc/hostname)
 
-              jmp admin create exporter "$EXPORTER_NAME" -n $JMP_NAMESPACE --label type=virtual --label device=qemu --save --insecure-tls --nointeractive --out ./dummy.yaml
+              jmp admin create exporter "$EXPORTER_NAME" -n $JMP_NAMESPACE --label type=virtual --label device=qemu --label arch=arm64_vm --save --insecure-tls --nointeractive --out ./dummy.yaml
               TOKEN=$(yq '.token' dummy.yaml)
               echo "$TOKEN" > token
 

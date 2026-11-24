@@ -1,0 +1,235 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: qemu-metal-exporter
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  replicas: 5
+  serviceName: qemu-metal-exporter
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app: qemu-metal-exporter
+  template:
+    metadata:
+      labels:
+        app: qemu-metal-exporter
+    annotations:
+        openshift.io/required-scc: privileged
+    spec:
+      #tolerations:
+      #- key: "metal"
+      #  operator: "Equal"
+      #  value: "true"
+      #  effect: "NoSchedule"
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: auto.node-role/metal
+                operator: In
+                values:
+                - "true"
+      serviceAccountName: qemu-metal-exporter
+      restartPolicy: Always
+      # give the preStop hook below enough time to run `oc delete exporter`
+      # before kubelet moves on to SIGTERM/SIGKILL
+      terminationGracePeriodSeconds: 60
+      volumes:
+        - name: registry-ca
+          configMap:
+            name: registry-service-ca
+
+      initContainers:
+        - name: jumpstarter-init
+          image: ghcr.io/rhadp-examples/rhas-exporter:latest
+          imagePullPolicy: Always
+          env:
+            - name: JMP_NAMESPACE
+              value: "auto-jumpstarter"
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -eo pipefail
+              source /venv/bin/activate
+
+              # Extract the values from the service account
+              TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+              NAMESPACE=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
+              API_SERVER=$(oc whoami --show-server)
+
+              # set ./kube/config correctly
+              mkdir -p ~/.kube
+
+              oc config set-cluster rhas \
+                --server=$API_SERVER \
+                --certificate-authority=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+
+              oc config set-credentials qemu-metal-exporter \
+                --token=$TOKEN
+
+              oc config set-context qemu-metal-exporter-ctx \
+                --cluster=rhas \
+                --user=qemu-metal-exporter \
+                --namespace=$NAMESPACE
+
+              oc config use-context qemu-metal-exporter-ctx
+
+              # check if exporter already exists and delete it if so ...
+
+              EXPORTER_NAME=$(cat /etc/hostname)
+              if oc get exporter "$EXPORTER_NAME" -n $JMP_NAMESPACE &>/dev/null; then
+                echo "Exporter '$EXPORTER_NAME' already exists, deleting it now ..."
+                oc delete exporter "$EXPORTER_NAME" -n $JMP_NAMESPACE || true
+              fi
+
+      containers:
+        - name: jumpstarter-exporter
+          image: ghcr.io/rhadp-examples/rhas-exporter:latest
+          imagePullPolicy: Always
+          resources:
+            limits:
+              cpu: 2.0
+              memory: "4G"
+            requests:
+              cpu: 1.0
+              memory: "2G"
+          securityContext:
+            privileged: true
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /bin/bash
+                  - -c
+                  - |
+                    source /venv/bin/activate
+
+                    EXPORTER_NAME=$(cat /etc/hostname)
+                    echo "Pod is terminating, deleting exporter '$EXPORTER_NAME' ..."
+
+                    # ~/.kube/config was already set up by the container's
+                    # main command on startup, so oc is already authenticated
+                    timeout 20s oc delete exporter "$EXPORTER_NAME" -n "$JMP_NAMESPACE" --ignore-not-found || true
+          volumeMounts:
+            - mountPath: /etc/pki/ca-trust/source/anchors/service-ca-bundle.crt
+              name: registry-ca
+              subPath: service-ca-bundle.crt
+              readOnly: true
+          env:
+            - name: JUMPSTARTER_GRPC_INSECURE
+              value: "1"
+            - name: JMP_NAMESPACE
+              value: "auto-jumpstarter"
+            - name: OCI_USERNAME
+              value: "serviceaccount"
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -eo pipefail
+              source /venv/bin/activate
+
+              # debugging - update to latest jumpstarter version
+              #uv pip install --reinstall "git+https://github.com/mickume/jumpstarter@develop#subdirectory=python/packages/jumpstarter-all"
+
+              # reinstall rhas drivers so their entry points survive the jumpstarter-all reinstall above
+              #uv pip install --reinstall /opt/rhas-driver-qemu /opt/rhas-driver-opendal /opt/rhas-driver-power
+
+              # Trust the internal registry's service-serving CA
+              if [ -f /etc/pki/ca-trust/source/anchors/service-ca-bundle.crt ]; then
+                  update-ca-trust
+              fi
+
+              # Extract the values from the service account
+              TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+              NAMESPACE=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
+              API_SERVER=$(oc whoami --show-server)
+
+              # upstream jumpstarter's OCI credential resolution only reads
+              # OCI_USERNAME/OCI_PASSWORD from the environment (no *_FILE
+              # fallback), so export the SA token here rather than pointing
+              # OCI_PASSWORD_FILE at it
+              export OCI_PASSWORD="$TOKEN"
+
+              # set ./kube/config correctly
+              mkdir -p ~/.kube
+
+              oc config set-cluster rhadp \
+                --server=$API_SERVER \
+                --certificate-authority=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+
+              oc config set-credentials qemu-metal-exporter \
+                --token=$TOKEN
+
+              oc config set-context qemu-metal-exporter-ctx \
+                --cluster=rhadp \
+                --user=qemu-metal-exporter \
+                --namespace=$NAMESPACE
+
+              oc config use-context qemu-metal-exporter-ctx
+
+              # create the exporter config
+              EXPORTER_NAME=$(cat /etc/hostname)
+
+              jmp admin create exporter "$EXPORTER_NAME" -n $JMP_NAMESPACE --label type=virtual --label device=qemu --label arch=arm64_metal --save --insecure-tls --nointeractive --out ./dummy.yaml
+              TOKEN=$(yq '.token' dummy.yaml)
+              echo "$TOKEN" > token
+
+              # remove the exporter config
+              rm ./dummy.yaml
+
+              # detect the endpoint
+              while [ -z "$ENDPOINT" ]
+              do
+                ENDPOINT=$(kubectl get -n $JMP_NAMESPACE \
+                  exporters.jumpstarter.dev $(cat /etc/hostname) -o jsonpath="{.status.endpoint}")
+                sleep 1s
+              done
+              echo "$ENDPOINT" > endpoint
+
+              cat <<EOF > qemu-metal-exporter.yaml
+              apiVersion: jumpstarter.dev/v1alpha1
+              kind: ExporterConfig
+              metadata:
+                namespace: $JMP_NAMESPACE
+                name: $(cat /etc/hostname)
+              endpoint: $(cat endpoint)
+              tls:
+                ca: ''
+                insecure: true
+              token: $(cat token)
+              export:
+                console:
+                  ref: qemu.console
+                flasher:
+                  ref: qemu.flasher
+                power:
+                  ref: qemu.power
+                qemu:
+                  type: rhas_driver_qemu.driver.Qemu
+                  config:
+                    smp: 2
+                    mem: 12G
+                    arch: aarch64
+                    default_partitions:
+                      OVMF_CODE.fd: /usr/share/AAVMF/AAVMF_CODE.fd
+                      OVMF_VARS.fd: /usr/share/AAVMF/AAVMF_VARS.fd
+                    hostfwd:
+                      ssh:
+                        hostport: 9022
+                        guestport: 22
+              EOF
+
+              sleep 60s
+
+              echo "Starting the exporter ..."
+
+              jmp run --exporter-config qemu-metal-exporter.yaml
+
+              #while true; do
+              #  sleep 30s
+              #done
