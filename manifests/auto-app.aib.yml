@@ -63,7 +63,7 @@ content:
     - audit
   container_images:
     - source: quay.io/shetze/auto-apps
-      tag: 'latest'
+      tag: 'f2'
       name: localhost/auto-apps
       containers-transport: docker
     - source: quay.io/shetze/ffi_server-arm64
@@ -445,7 +445,7 @@ qm:
         tag: stream10
         name: localhost/cs10      
       - source: quay.io/shetze/auto-apps
-        tag: 'latest'
+        tag: 'f2'
         name: localhost/auto-apps
       - source: quay.io/shetze/ffi_client-arm64
         tag: latest
@@ -519,7 +519,7 @@ qm:
           [Container]
           Image=localhost/auto-apps
           Environment=SOCKET_PATH=/run/vsomeip/vsomeip-0
-          Environment=RADIO_DEMO_CPU_MS=200
+          Environment=RADIO_DEMO_CPU_MS=150
           Environment=RADIO_DEMO_HOLD_MUTEX=1
           Environment=RADIO_DEMO_RAM_SIZE=256M
           Volume=/run/vsomeip/:/run/vsomeip/
