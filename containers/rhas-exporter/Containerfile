@@ -1,3 +1,41 @@
+# --- build stage: qemu-system-<arch> ---------------------------------------
+# RHEL/CentOS Stream 10 only ship qemu-kvm (native arch only), and neither
+# EPEL 10 nor the CentOS Virt SIG package qemu-system-*. Build them from
+# source so the exporter can run VMs of a different arch than the node
+# (e.g. x86_64 VMs on arm64 nodes, or the reverse). Without KVM the qemu
+# driver prefers qemu-system-<arch> over the qemu-kvm TCG fallback.
+FROM quay.io/centos/centos:stream10 AS qemu-build
+
+ARG QEMU_VERSION=11.1.3 \
+    QEMU_SHA256=5a8289c7940dc77d3873c81a6c29ba3afe1446fc9d36e77fa1658cdbecb84b22 \
+    QEMU_TARGETS=aarch64-softmmu,x86_64-softmmu
+
+# ninja-build, libslirp-devel and libfdt-devel live in CRB
+RUN dnf install -y --setopt=tsflags=nodocs dnf-plugins-core && \
+    dnf config-manager --set-enabled crb && \
+    dnf install -y --setopt=tsflags=nodocs \
+        gcc make ninja-build python3 xz bzip2 diffutils findutils \
+        glib2-devel pixman-devel zlib-devel libslirp-devel libfdt-devel && \
+    dnf -y clean all && rm -rf /var/cache/dnf
+
+# --enable-* for what the qemu driver relies on, so a missing dependency
+# fails the build instead of producing a binary without it:
+# slirp (-netdev user + hostfwd), vnc (-vnc unix:), tpm (-tpmdev emulator),
+# vhost-kernel (vhost-vsock), fdt (aarch64 'virt' machine).
+RUN curl -fsSL -o /tmp/qemu.tar.xz "https://download.qemu.org/qemu-${QEMU_VERSION}.tar.xz" && \
+    echo "${QEMU_SHA256}  /tmp/qemu.tar.xz" | sha256sum -c - && \
+    mkdir /tmp/qemu && tar -xJf /tmp/qemu.tar.xz -C /tmp/qemu --strip-components=1 && \
+    cd /tmp/qemu && \
+    ./configure \
+        --prefix=/usr/local \
+        --target-list="${QEMU_TARGETS}" \
+        --enable-slirp --enable-vnc --enable-tpm --enable-vhost-kernel --enable-fdt=system \
+        --disable-docs --disable-user --disable-gtk --disable-sdl --disable-opengl && \
+    make -j"$(nproc)" && \
+    make install && \
+    rm -rf /tmp/qemu /tmp/qemu.tar.xz
+
+# --- exporter image --------------------------------------------------------
 FROM ghcr.io/rhadp/runtime:latest
 # see https://github.com/rhadp/containers/blob/main/containers/runtime/Containerfile
 
@@ -23,7 +61,7 @@ ENV JUMPSTARTER_REPO=https://github.com/mickume/jumpstarter \
 
 # install basic packages & virtualization packages
 ARG CENTOS_STREAM_VERSION=10.0-23.el10 \
-    FLASHER_VERSION=0.3.0
+    FLASHER_VERSION=0.4.1
 
 # UBI10 doesn't ship qemu-kvm/libvirt/the @virtualization-* groups, and this
 # build environment has no RHEL entitlement (subscription-manager) to reach
@@ -49,6 +87,15 @@ RUN dnf install -y --setopt=tsflags=nodocs \
     swtpm swtpm-tools tpm2-tools && \
     dnf -y clean all --enablerepo='*' && \
     rm -rf /var/cache/dnf
+
+# qemu-system-<arch> from the build stage, plus its firmware/data files
+# (edk2-*.fd, SeaBIOS, option ROMs, VNC keymaps) and runtime libraries
+COPY --from=qemu-build /usr/local/bin/qemu-system-* /usr/local/bin/
+COPY --from=qemu-build /usr/local/share/qemu /usr/local/share/qemu
+RUN dnf install -y --setopt=tsflags=nodocs glib2 pixman zlib libslirp libfdt && \
+    dnf -y clean all --enablerepo='*' && \
+    rm -rf /var/cache/dnf && \
+    for q in /usr/local/bin/qemu-system-*; do "$q" --version; done
 
 # install swtpm
 # entrypoint.sh only runs `swtpm socket`, so only the tpmstate dir is

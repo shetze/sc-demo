@@ -29,6 +29,16 @@ export:
         root: /var/lib/jumpstarter/images/root.qcow2
 ```
 
+## Acceleration
+
+When `arch` matches the host and `/dev/kvm` is usable (bare metal), the driver
+runs `qemu-kvm` with KVM. Without KVM it uses `qemu-system-<arch>` (TCG) if
+installed; otherwise, for the host's own arch, it falls back to `qemu-kvm
+-accel tcg`. This covers RHEL/CentOS images, which ship only `qemu-kvm`, on
+nodes without nested virtualization. Without KVM the default aarch64 CPU is
+`max,pauth-impdef=on`. TCG emulation is much slower than KVM, so
+allow longer boot timeouts.
+
 ## Drivers
 
 - `RhasQemu` (`rhas_driver_qemu.driver.Qemu`) — composite driver managing the

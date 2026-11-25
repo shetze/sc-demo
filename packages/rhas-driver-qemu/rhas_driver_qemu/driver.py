@@ -206,6 +206,66 @@ class QemuFlasher(FlasherInterface, Driver):
 class QemuPower(PowerInterface, Driver):
     parent: Qemu
 
+    def _select_qemu(self) -> tuple[str, Literal["kvm", "tcg"] | None]:
+        """Pick the QEMU binary and the accelerator to pass with ``-accel``.
+
+        Returns ``(binary, accel)``, where ``accel`` is ``None`` when QEMU
+        should use its built-in default (TCG for ``qemu-system-*``).
+
+        1. Sidecar mode: the runtime container is assumed to have KVM and
+           qemu-kvm.
+        2. Native arch with a usable ``/dev/kvm`` (bare metal): qemu-kvm
+           with KVM.
+        3. No KVM, but ``qemu-system-<arch>`` is installed: use it (TCG).
+        4. No KVM, native arch, only qemu-kvm installed (RHEL/CentOS ship no
+           ``qemu-system-*``, e.g. a non-metal cloud node without nested
+           virtualization): qemu-kvm with TCG emulation.
+        """
+        arch = self.parent.arch
+
+        if self.parent.launcher_socket:
+            return "/usr/libexec/qemu-kvm", "kvm"
+
+        native = arch == platform.machine()
+        qemu_kvm = next(
+            (p for p in ("/usr/libexec/qemu-kvm", "/usr/bin/qemu-kvm") if Path(p).exists()),
+            shutil.which("qemu-kvm"),
+        )
+
+        if native and os.access("/dev/kvm", os.R_OK | os.W_OK):
+            return qemu_kvm or "qemu-kvm", "kvm"
+
+        qemu_system = f"qemu-system-{arch}"
+        if shutil.which(qemu_system):
+            return qemu_system, None
+
+        if native and qemu_kvm:
+            self.logger.warning(
+                "/dev/kvm is not available, falling back to TCG emulation with %s (expect a much slower VM)",
+                qemu_kvm,
+            )
+            return qemu_kvm, "tcg"
+
+        raise RuntimeError(
+            f"no usable QEMU for arch {arch!r} on a {platform.machine()!r} host: "
+            f"/dev/kvm is not available and {qemu_system} is not installed"
+        )
+
+    def _default_cpu(self, accel: Literal["kvm", "tcg"] | None) -> str | None:
+        """CPU model to use when the config does not set ``cpu``."""
+        if accel == "kvm":
+            return "host"
+
+        match self.parent.arch:
+            case "aarch64":
+                # cortex-a57 is deprecated in RHEL 10 qemu-kvm. 'max' is the
+                # suggested replacement; pauth-impdef swaps the very slow
+                # emulated QARMA pointer-auth algorithm for a cheap one.
+                return "max,pauth-impdef=on"
+            case "x86_64":
+                return "qemu64,+ssse3,+sse4.1,+sse4.2,+popcnt"
+        return None
+
     @export
     async def on(self) -> None:  # noqa: C901
         if hasattr(self, "_process"):
@@ -219,20 +279,7 @@ class QemuPower(PowerInterface, Driver):
 
         cpu = self.parent.cpu
 
-        # Determine QEMU binary path
-        # In sidecar mode, assume runtime container has KVM and qemu-kvm
-        kvm_available = (
-            self.parent.launcher_socket is not None
-            or (self.parent.arch == platform.machine() and os.access("/dev/kvm", os.R_OK | os.W_OK))
-        )
-
-        if kvm_available:
-            # Try common locations for qemu-kvm
-            for qemu_binary in ["/usr/libexec/qemu-kvm", "/usr/bin/qemu-kvm", "qemu-kvm"]:
-                if self.parent.launcher_socket or Path(qemu_binary).exists() or "/" not in qemu_binary:
-                    break
-        else:
-            qemu_binary = f"qemu-system-{self.parent.arch}"
+        qemu_binary, accel = self._select_qemu()
 
         cmdline = [
             qemu_binary,
@@ -240,27 +287,20 @@ class QemuPower(PowerInterface, Driver):
             "-nographic",
         ]
 
-        if kvm_available:
+        if accel is not None:
             cmdline += [
                 "-accel",
-                "kvm",
+                accel,
             ]
 
-            if cpu is None:
-                cpu = "host"
+        if cpu is None:
+            cpu = self._default_cpu(accel)
 
         match self.parent.arch:
             case "aarch64":
                 cmdline += ["-machine", "virt"]
             case "x86_64":
                 cmdline += ["-machine", "q35"]
-
-        if cpu is None:
-            match self.parent.arch:
-                case "aarch64":
-                    cpu = "cortex-a57"
-                case "x86_64":
-                    cpu = "qemu64,+ssse3,+sse4.1,+sse4.2,+popcnt"
 
         cmdline += [
             "-cpu",

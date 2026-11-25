@@ -18,11 +18,6 @@ spec:
     annotations:
         openshift.io/required-scc: privileged
     spec:
-      #tolerations:
-      #- key: "metal"
-      #  operator: "Equal"
-      #  value: "true"
-      #  effect: "NoSchedule"
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -89,11 +84,11 @@ spec:
           imagePullPolicy: Always
           resources:
             limits:
-              cpu: 2.0
-              memory: "4G"
-            requests:
               cpu: 1.0
               memory: "2G"
+            requests:
+              cpu: 0.5
+              memory: "1G"
           securityContext:
             privileged: true
           lifecycle:
@@ -123,6 +118,8 @@ spec:
               value: "auto-jumpstarter"
             - name: OCI_USERNAME
               value: "serviceaccount"
+            - name: UPDATE_DRIVERS
+              value: "0"
           command:
             - /bin/bash
             - -c
@@ -134,6 +131,17 @@ spec:
               if [ -f /etc/pki/ca-trust/source/anchors/service-ca-bundle.crt ]; then
                   update-ca-trust
               fi
+
+              # debugging - update to latest jumpstarter version and qemu drivers
+              if [ "$UPDATE_DRIVERS" = "1" ]; then
+                echo "Updating jumpstarter version and qemu drivers ..."
+
+                uv pip install --reinstall \
+                  "git+${JUMPSTARTER_REPO}@${JUMPSTARTER_VERSION}#subdirectory=python/packages/jumpstarter-all" \
+                  "git+${RHAS_STARTER_REPO}@${RHAS_STARTER_VERSION}#subdirectory=packages/rhas-driver-qemu" \
+                  "git+${RHAS_STARTER_REPO}@${RHAS_STARTER_VERSION}#subdirectory=packages/rhas-driver-opendal" \
+                  "git+${RHAS_STARTER_REPO}@${RHAS_STARTER_VERSION}#subdirectory=packages/rhas-driver-power"
+              fi 
 
               # Extract the values from the service account
               TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
@@ -166,6 +174,10 @@ spec:
               # create the exporter config
               EXPORTER_NAME=$(cat /etc/hostname)
 
+              # delete the exporter if it already exists
+              timeout 30s oc delete exporter "$EXPORTER_NAME" -n "$JMP_NAMESPACE" --ignore-not-found || true
+
+              # create the exporter config
               jmp admin create exporter "$EXPORTER_NAME" -n $JMP_NAMESPACE --label type=virtual --label device=mock --save --insecure-tls --nointeractive --out ./dummy.yaml
               TOKEN=$(yq '.token' dummy.yaml)
               echo "$TOKEN" > token
@@ -200,10 +212,9 @@ spec:
                   type: rhas_driver_power.driver.MockPower
               EOF
 
-              sleep 60s
+              sleep 30s
 
               echo "Starting the exporter ..."
-
               jmp run --exporter-config mock-exporter.yaml
 
               #while true; do
