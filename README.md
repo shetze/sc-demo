@@ -4,7 +4,8 @@ A starter project for building RHIVOS/AutoSD images with a simple test applicati
 
 ## TLDR
 
-Build a C++ application, package it as an RPM, and install it into an AutoSD OS image using the Automotive Image Builder. Then boot the image as a QEMU virtual device via Jumpstarter and run automated tests to validate everything works.
+Build a C++ application, package it as an RPM, and install it into an AutoSD OS image using the Automotive Image Builder. Then boot the image as 
+a QEMU virtual device via Jumpstarter and run automated tests to validate everything works.
 
 ## Description
 
@@ -26,16 +27,16 @@ There are two ways to build and validate:
 
 Open this repository in OpenShift DevSpaces to get a pre-configured workspace with all required tools (CMake, rpmbuild, `caib` CLI, Jumpstarter CLI).
 
-1. Build the application: `make build-local`
-2. Build the RPM: `make build-rpm-local`
-3. Build the OS image using the `caib` CLI and the manifest at `manifests/auto-app.aib.yml`.
-4. Flash and test the image on a Jumpstarter virtual device using `pytest tests/boot_test.py`.
+- Build the application: `make build-local`
+- Build the RPM: `make build-rpm-local`
 
 See the Makefile for all available targets.
 
 ### Pipelines-as-Code
 
-PipelineRun definitions live in the `.tekton/` directory. A GitHub webhook sends push and pull request events to the PAC controller on the OpenShift cluster. PAC matches the event against annotations in `.tekton/pr-build-validate.yaml` and triggers the pipeline when changes are made to `src/**` or `manifests/**` on the `main` branch.
+PipelineRun definitions live in the `.tekton/` directory. A GitHub webhook sends push and pull request events to the PAC controller on the OpenShift cluster. 
+PAC matches the event against annotations in `.tekton/pr-build-validate.yaml` and triggers the pipeline when changes are 
+made to `src/**` or `manifests/**` on the `main` branch.
 
 The pipeline runs the following steps:
 
@@ -46,6 +47,36 @@ The pipeline runs the following steps:
 5. **validate** — run `pytest tests/boot_test.py` to verify boot, login, and application execution.
 
 To trigger a pipeline run, push a commit or open a pull request that modifies files under `src/` or `manifests/`.
+
+To trigger a build without pushing code to the git forge, use script `trigger-pipeline.sh`:
+
+```shell
+./scripts/trigger-pipeline.sh
+```
+
+### Using `jmp`
+
+In your Red Hat DevSpace workspace, flash and boot a virtual device:
+
+
+```shell
+# show existing builds
+caib image list
+
+NAME                            STATUS     NOTIFICATION  AGE  REQUESTED BY                                                           ARTIFACT
+pr-build-validate-lbbkb-af0c9   Completed  -             2h   system:serviceaccount:buildspace-shetze-sc-demo:pipeline               default-route-openshift-image-registry.apps.rhas.sandbox1108.opentlc.com/automotive-dev-operator-system/pr-build-validate-lbbkb-af0c9:disk
+
+DISKIMAGE=default-route-openshift-image-registry.apps.rhas.sandbox1108.opentlc.com/automotive-dev-operator-system/pr-build-validate-lbbkb-af0c9:disk
+
+# get a device lease and flash it
+jmp shell -l device=qemu --duration 1h
+
+j flasher flash oci://$DISKIMAGE
+
+# 'boot' the virtual device and login
+j power on && j console start-console
+
+```
 
 ## Setup
 
@@ -60,10 +91,8 @@ To trigger a pipeline run, push a commit or open a pull request that modifies fi
 
 ### OpenShift DevSpaces workspace setup
 
-1. Get your OpenShift login token from the OpenShift web console: **Copy login command** > **Display Token** > copy the token.
-2. Open a terminal in the workspace and paste the login command to complete OpenShift setup.
-3. Log into Jumpstarter: run `jmp-login`, follow the Keycloak link, and authenticate.
-4. Verify the setup: run `caib status` to confirm the Builder connection is working.
+1. Open a terminal in the workspace and log into Jumpstarter: run `jmp-login`, follow the Keycloak link, and authenticate.
+2. Verify the setup: run `caib status` to confirm the Builder connection is working.
 
 ### Project / Pipeline-as-Code setup
 
