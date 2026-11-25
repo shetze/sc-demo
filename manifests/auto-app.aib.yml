@@ -521,7 +521,7 @@ qm:
           Environment=SOCKET_PATH=/run/vsomeip/vsomeip-0
           Environment=RADIO_DEMO_CPU_MS=200
           Environment=RADIO_DEMO_HOLD_MUTEX=1
-          Environment=RADIO_DEMO_RAM_SIZE=768M
+          Environment=RADIO_DEMO_RAM_SIZE=256M
           Volume=/run/vsomeip/:/run/vsomeip/
           Volume=/run/dlt/:/run/dlt/
           Volume=/run/ipc/:/run/ipc/
