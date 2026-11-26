@@ -439,21 +439,18 @@ qm:
           
           [Install]
           WantedBy=multi-user.target
-      # The SOME/IP endpoint belongs in an ipc-labeled QM container. Only a
-      # local restricted native QM helper can talk to the QM systemd manager.
-      # This mirrors the proven root Controller -> host-agent separation.
-      - path: /usr/lib/tmpfiles.d/auto-apps-qm-agent.conf
-        text: |
-          d /run/ipc/auto-apps-qm-agent 0700 root root -
+      # Private communication between two QM-local processes does not cross
+      # the Root/QM boundary.  The native QM systemd manager must create and
+      # own this socket directory (NOT Root /run/ipc tmpfiles).  Do not mount
+      # the root-shared ipc_var_run_t tree for this private resource channel.
       - path: /etc/systemd/system/auto-apps-qm-resource-agent.service
         text: |
           [Unit]
           Description=Auto Apps restricted QM systemd resource helper (DEMO)
-          Wants=systemd-tmpfiles-setup.service
-          After=systemd-tmpfiles-setup.service
 
           [Service]
-          Type=simple
+          Type=notify
+          NotifyAccess=main
           Environment=AUTO_APPS_AGENT_SCOPE=qm
           Environment=AUTO_APPS_HOST_AGENT_TUNING=1
           ExecStart=/usr/bin/controller-host-agent
@@ -463,7 +460,9 @@ qm:
           PrivateTmp=yes
           ProtectHome=yes
           ProtectSystem=strict
-          ReadWritePaths=/run/ipc/auto-apps-qm-agent
+          RuntimeDirectory=auto-apps-qm-agent
+          RuntimeDirectoryMode=0700
+          RuntimeDirectoryPreserve=restart
 
           [Install]
           WantedBy=multi-user.target
@@ -471,8 +470,7 @@ qm:
         text: |
           [Unit]
           Description=Auto Apps QM SOME/IP controller proxy (qm_container_ipc_t)
-          Requires=routingmanagerd.service
-          Wants=auto-apps-qm-resource-agent.service
+          Requires=routingmanagerd.service auto-apps-qm-resource-agent.service
           After=routingmanagerd.service auto-apps-qm-resource-agent.service
 
           [Container]
@@ -482,7 +480,7 @@ qm:
           Environment=VSOMEIP_CONFIGURATION=/usr/share/auto-apps/vsomeip-ipc.json
           Volume=/run/vsomeip/:/run/vsomeip/
           Volume=/run/dlt/:/run/dlt/
-          Volume=/run/ipc/auto-apps-qm-agent:/run/ipc/auto-apps-qm-agent:ro
+          Volume=/run/auto-apps-qm-agent:/run/auto-apps-qm-agent:ro
           SecurityLabelType=qm_container_ipc_t
           Exec=/usr/bin/controller-qm-agent
 
