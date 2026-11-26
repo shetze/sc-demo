@@ -171,11 +171,12 @@ content:
         Image=localhost/auto-apps
         Network=none
         Environment=SOCKET_PATH=/run/vsomeip/vsomeip-0
+        Environment=VSOMEIP_CONFIGURATION=/usr/share/auto-apps/vsomeip-ipc.json
         Environment=ENGINE_DEMO_CPU_MS=400
         Environment=ENGINE_DEMO_HOLD_MUTEX=0
         Environment=ENGINE_DEMO_RAM_SIZE=10M
-        Volume=/var/run/vsomeip/:/var/run/vsomeip/
-        Volume=/var/run/dlt/:/var/run/dlt/
+        Volume=/run/vsomeip/:/run/vsomeip/
+        Volume=/run/dlt/:/run/dlt/
         SecurityLabelType=ipc_t
         Exec=/usr/bin/engine-service
         
@@ -223,6 +224,7 @@ content:
         Image=localhost/auto-apps
         Network=none
         Environment=SOCKET_PATH=/run/vsomeip/vsomeip-0
+        Environment=VSOMEIP_CONFIGURATION=/usr/share/auto-apps/vsomeip-ipc.json
         Environment=AUTO_APPS_CONTROLLER_TUNING=1
         Volume=/run/vsomeip/:/run/vsomeip/
         Volume=/run/dlt/:/run/dlt/
@@ -246,6 +248,7 @@ content:
         [Container]
         Image=localhost/auto-apps
         Environment=SOCKET_PATH=/run/vsomeip/vsomeip-0
+        Environment=VSOMEIP_CONFIGURATION=/usr/share/auto-apps/vsomeip-ipc.json
         Volume=/run/vsomeip/:/run/vsomeip/
         Volume=/run/dlt/:/run/dlt/
         Volume=/run/ipc/:/run/ipc/
@@ -435,12 +438,14 @@ qm:
           
           [Install]
           WantedBy=multi-user.target
-      # Agent is native to QM's systemd; never modify units in root.
+      # Agent remains native to QM's systemd, with its own UDS-only vsomeip
+      # config. The Root TCP routing host at 10.88.0.1:31000 is not listening;
+      # using the same shared Unix socket as working multimedia apps avoids it.
       - path: /etc/systemd/system/auto-apps-qm-agent.service
         text: |
           [Unit]
           Description=Auto Apps QM-local resource tuning agent (DEMO)
-          Wants=routingmanagerd.service
+          Requires=routingmanagerd.service
           After=routingmanagerd.service
 
           [Service]
@@ -467,6 +472,7 @@ qm:
           [Container]
           Image=localhost/auto-apps
           Environment=SOCKET_PATH=/run/vsomeip/vsomeip-0
+          Environment=VSOMEIP_CONFIGURATION=/usr/share/auto-apps/vsomeip-ipc.json
           Environment=RADIO_DEMO_CPU_MS=150
           Environment=RADIO_DEMO_HOLD_MUTEX=1
           Environment=RADIO_DEMO_RAM_SIZE=256M
