@@ -185,25 +185,54 @@ content:
         
         [Install]
         WantedBy=multi-user.target
-    # Root-partition controller: a native host unit, never inside QM.
-    # Tuning is an explicitly enabled DEMO feature, not certified FFI control.
-    - path: /etc/systemd/system/auto-apps-controller.service
+    # Controller talks to SOME/IP from an ipc_t root container, exactly like
+    # the Engine. Host systemd operations are delegated to a native helper;
+    # the Controller container never gets the host systemd D-Bus socket.
+    - path: /usr/lib/tmpfiles.d/auto-apps-controller.conf
+      text: |
+        d /run/ipc/auto-apps-controller 0700 root root -
+    - path: /etc/systemd/system/auto-apps-controller-host-agent.service
       text: |
         [Unit]
-        Description=Auto Apps root partition resource and health controller (DEMO)
-        Wants=routingmanagerd.service
-        After=routingmanagerd.service
+        Description=Auto Apps restricted root systemd resource agent (DEMO)
+        Wants=systemd-tmpfiles-setup.service
+        After=systemd-tmpfiles-setup.service
 
         [Service]
         Type=simple
-        ExecStart=/usr/bin/controller-service
+        Environment=AUTO_APPS_HOST_AGENT_TUNING=1
+        ExecStart=/usr/bin/controller-host-agent
+        Restart=on-failure
+        RestartSec=3
+        NoNewPrivileges=yes
+        PrivateTmp=yes
+        ProtectHome=yes
+        ProtectSystem=strict
+        ReadWritePaths=/run/ipc/auto-apps-controller
+
+        [Install]
+        WantedBy=multi-user.target
+    - path: /etc/containers/systemd/controller.container
+      text: |
+        [Unit]
+        Description=Auto Apps SOME/IP resource controller (root, ipc_t)
+        Wants=routingmanagerd.service auto-apps-controller-host-agent.service
+        After=routingmanagerd.service auto-apps-controller-host-agent.service
+
+        [Container]
+        Image=localhost/auto-apps
+        Network=none
         Environment=SOCKET_PATH=/run/vsomeip/vsomeip-0
         Environment=AUTO_APPS_CONTROLLER_TUNING=1
-        Restart=always
-        RestartSec=2
-        NoNewPrivileges=yes
-        ProtectHome=yes
-        ProtectSystem=full
+        Volume=/run/vsomeip/:/run/vsomeip/
+        Volume=/run/dlt/:/run/dlt/
+        Volume=/run/ipc/auto-apps-controller:/run/ipc/auto-apps-controller:ro
+        SecurityLabelType=ipc_t
+        Exec=/usr/bin/controller-service
+
+        [Service]
+        Restart=on-failure
+        RestartSec=3
 
         [Install]
         WantedBy=multi-user.target
@@ -332,7 +361,7 @@ content:
       - sshd.service
       - routingmanagerd.service
       - dlt.service
-      - auto-apps-controller.service
+      - auto-apps-controller-host-agent.service
 
 
 qm:
@@ -416,8 +445,12 @@ qm:
 
           [Service]
           Type=simple
+          ExecStartPre=/usr/bin/python3 /usr/libexec/auto-apps/configure-qm-agent-vsomeip.py --input /etc/vsomeip.json --output /run/auto-apps-qm-agent/vsomeip.json
           ExecStart=/usr/bin/controller-qm-agent
           Environment=SOCKET_PATH=/run/vsomeip/vsomeip-0
+          Environment=VSOMEIP_CONFIGURATION=/run/auto-apps-qm-agent/vsomeip.json
+          RuntimeDirectory=auto-apps-qm-agent
+          RuntimeDirectoryMode=0700
           Restart=always
           RestartSec=2
           NoNewPrivileges=yes
