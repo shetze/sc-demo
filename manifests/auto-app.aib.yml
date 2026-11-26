@@ -226,6 +226,7 @@ content:
         Environment=SOCKET_PATH=/run/vsomeip/vsomeip-0
         Environment=VSOMEIP_CONFIGURATION=/usr/share/auto-apps/vsomeip-ipc.json
         Environment=AUTO_APPS_CONTROLLER_TUNING=1
+        Environment=AUTO_APPS_MM_CPU_BASELINE_MS=150
         Volume=/run/vsomeip/:/run/vsomeip/
         Volume=/run/dlt/:/run/dlt/
         Volume=/run/ipc/auto-apps-controller:/run/ipc/auto-apps-controller:ro
@@ -438,29 +439,56 @@ qm:
           
           [Install]
           WantedBy=multi-user.target
-      # Agent remains native to QM's systemd, with its own UDS-only vsomeip
-      # config. The Root TCP routing host at 10.88.0.1:31000 is not listening;
-      # using the same shared Unix socket as working multimedia apps avoids it.
-      - path: /etc/systemd/system/auto-apps-qm-agent.service
+      # The SOME/IP endpoint belongs in an ipc-labeled QM container. Only a
+      # local restricted native QM helper can talk to the QM systemd manager.
+      # This mirrors the proven root Controller -> host-agent separation.
+      - path: /usr/lib/tmpfiles.d/auto-apps-qm-agent.conf
+        text: |
+          d /run/ipc/auto-apps-qm-agent 0700 root root -
+      - path: /etc/systemd/system/auto-apps-qm-resource-agent.service
         text: |
           [Unit]
-          Description=Auto Apps QM-local resource tuning agent (DEMO)
-          Requires=routingmanagerd.service
-          After=routingmanagerd.service
+          Description=Auto Apps restricted QM systemd resource helper (DEMO)
+          Wants=systemd-tmpfiles-setup.service
+          After=systemd-tmpfiles-setup.service
 
           [Service]
           Type=simple
-          ExecStartPre=/usr/bin/python3 /usr/libexec/auto-apps/configure-qm-agent-vsomeip.py --input /etc/vsomeip.json --output /run/auto-apps-qm-agent/vsomeip.json
-          ExecStart=/usr/bin/controller-qm-agent
-          Environment=SOCKET_PATH=/run/vsomeip/vsomeip-0
-          Environment=VSOMEIP_CONFIGURATION=/run/auto-apps-qm-agent/vsomeip.json
-          RuntimeDirectory=auto-apps-qm-agent
-          RuntimeDirectoryMode=0700
-          Restart=always
-          RestartSec=2
+          Environment=AUTO_APPS_AGENT_SCOPE=qm
+          Environment=AUTO_APPS_HOST_AGENT_TUNING=1
+          ExecStart=/usr/bin/controller-host-agent
+          Restart=on-failure
+          RestartSec=3
           NoNewPrivileges=yes
+          PrivateTmp=yes
           ProtectHome=yes
-          ProtectSystem=full
+          ProtectSystem=strict
+          ReadWritePaths=/run/ipc/auto-apps-qm-agent
+
+          [Install]
+          WantedBy=multi-user.target
+      - path: /etc/containers/systemd/controller-qm-agent.container
+        text: |
+          [Unit]
+          Description=Auto Apps QM SOME/IP controller proxy (qm_container_ipc_t)
+          Requires=routingmanagerd.service
+          Wants=auto-apps-qm-resource-agent.service
+          After=routingmanagerd.service auto-apps-qm-resource-agent.service
+
+          [Container]
+          Image=localhost/auto-apps
+          Network=none
+          Environment=SOCKET_PATH=/run/vsomeip/vsomeip-0
+          Environment=VSOMEIP_CONFIGURATION=/usr/share/auto-apps/vsomeip-ipc.json
+          Volume=/run/vsomeip/:/run/vsomeip/
+          Volume=/run/dlt/:/run/dlt/
+          Volume=/run/ipc/auto-apps-qm-agent:/run/ipc/auto-apps-qm-agent:ro
+          SecurityLabelType=qm_container_ipc_t
+          Exec=/usr/bin/controller-qm-agent
+
+          [Service]
+          Restart=on-failure
+          RestartSec=3
 
           [Install]
           WantedBy=multi-user.target
@@ -609,7 +637,7 @@ qm:
 
     systemd:
       enabled_services:
-        - auto-apps-qm-agent.service
+        - auto-apps-qm-resource-agent.service
 
 #network:
 #  dynamic: {}
