@@ -185,6 +185,28 @@ content:
         
         [Install]
         WantedBy=multi-user.target
+    # Root-partition controller: a native host unit, never inside QM.
+    # Tuning is an explicitly enabled DEMO feature, not certified FFI control.
+    - path: /etc/systemd/system/auto-apps-controller.service
+      text: |
+        [Unit]
+        Description=Auto Apps root partition resource and health controller (DEMO)
+        Wants=routingmanagerd.service
+        After=routingmanagerd.service
+
+        [Service]
+        Type=simple
+        ExecStart=/usr/bin/controller-service
+        Environment=SOCKET_PATH=/run/vsomeip/vsomeip-0
+        Environment=AUTO_APPS_CONTROLLER_TUNING=1
+        Restart=always
+        RestartSec=2
+        NoNewPrivileges=yes
+        ProtectHome=yes
+        ProtectSystem=full
+
+        [Install]
+        WantedBy=multi-user.target
     - path: /etc/containers/systemd/sensors.container
       text: |
         [Unit]
@@ -250,6 +272,14 @@ content:
             {
               "name": "Sensors",
               "id": "0x1003"
+            },
+            {
+              "name": "Controller",
+              "id": "0x1004"
+            },
+            {
+              "name": "Controller QM Agent",
+              "id": "0x1005"
             }
           ],
           "services": [
@@ -267,6 +297,16 @@ content:
               "service": "0x1003",
               "instance": "0x01",
               "reliable": "30511"
+            },
+            {
+              "service": "0x1004",
+              "instance": "0x01",
+              "unreliable": "30509"
+            },
+            {
+              "service": "0x1005",
+              "instance": "0x01",
+              "unreliable": "30509"
             }
           ],
           "service-discovery": {
@@ -292,6 +332,7 @@ content:
       - sshd.service
       - routingmanagerd.service
       - dlt.service
+      - auto-apps-controller.service
 
 
 qm:
@@ -363,6 +404,26 @@ qm:
           Restart=always
           Type=notify
           
+          [Install]
+          WantedBy=multi-user.target
+      # Agent is native to QM's systemd; never modify units in root.
+      - path: /etc/systemd/system/auto-apps-qm-agent.service
+        text: |
+          [Unit]
+          Description=Auto Apps QM-local resource tuning agent (DEMO)
+          Wants=routingmanagerd.service
+          After=routingmanagerd.service
+
+          [Service]
+          Type=simple
+          ExecStart=/usr/bin/controller-qm-agent
+          Environment=SOCKET_PATH=/run/vsomeip/vsomeip-0
+          Restart=always
+          RestartSec=2
+          NoNewPrivileges=yes
+          ProtectHome=yes
+          ProtectSystem=full
+
           [Install]
           WantedBy=multi-user.target
       - path: /etc/containers/systemd/multimedia.container
@@ -455,6 +516,14 @@ qm:
               {
                 "name": "Sensors",
                 "id": "0x1003"
+              },
+              {
+                "name": "Controller",
+                "id": "0x1004"
+              },
+              {
+                "name": "Controller QM Agent",
+                "id": "0x1005"
               }
             ],
             "services": [
@@ -472,6 +541,16 @@ qm:
                 "service": "0x1003",
                 "instance": "0x01",
                 "reliable": "30511"
+              },
+              {
+                "service": "0x1004",
+                "instance": "0x01",
+                "unreliable": "30509"
+              },
+              {
+                "service": "0x1005",
+                "instance": "0x01",
+                "unreliable": "30509"
               }
             ],
             "service-discovery": {
@@ -488,6 +567,10 @@ qm:
               "request_response_delay": "1500"
             }
           }
+
+    systemd:
+      enabled_services:
+        - auto-apps-qm-agent.service
 
 #network:
 #  dynamic: {}
